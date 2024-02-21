@@ -252,6 +252,7 @@ def get_events():
     min_rtg = request.args.get('min_rating')
     max_rtg = request.args.get('max_rating')
 
+    # Converting to int, and preventing TypeError
     if min_frq is None:
         min_frq = 0
     else:
