@@ -43,3 +43,4 @@ Extra Notes:
 - hacker_id would be a foreign key to link it to the other tables.
 - For a hacker to register to an event, they could scan a QR code that redirects them to a url, like /event/(EVENT_NAME),
   which would trigger the event being added to hacker_events with their hacker_id
+- There can also be another endpoint that allows users to rate how much they enjoyed the event.
