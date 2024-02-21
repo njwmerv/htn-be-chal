@@ -30,17 +30,21 @@ def get_all_users():
             cursor.execute('SELECT skill, rating FROM hacker_skills WHERE ? = hacker_id;', (hid,))
             skills_of_hacker = cursor.fetchall()
 
+            cursor.execute('SELECT event, rating FROM hacker_events WHERE ? = hacker_id;', (hid,))
+            events_attended = cursor.fetchall()
+
         except sqlite3.OperationalError as err:
             conn.close()
             return f"Operational Error: {err}", 500
 
         # Add the hacker's info to all_users to be JSONified later
         all_users[hid] = {
-            "name": hacker[1],
-            "company": hacker[2],
-            "email": hacker[3],
-            "phone": hacker[4],
-            "skills": skills_of_hacker
+            "1. name": hacker[1],
+            "2. company": hacker[2],
+            "3. email": hacker[3],
+            "4. phone": hacker[4],
+            "5. skills": skills_of_hacker,
+            "6. events": events_attended
         }
         
     conn.close() # Done accessing database
@@ -71,6 +75,10 @@ def get_one_user(hacker_id):
         cursor.execute('SELECT skill, rating FROM hacker_skills WHERE hacker_id = ?;', (hacker_id,))
         skills = cursor.fetchall()
 
+        # Querying their events
+        cursor.execute('SELECT event, rating FROM hacker_events WHERE hacker_id = ?;', (hacker_id,))
+        events = cursor.fetchall()
+
         conn.close() # Done using the database
     
     except sqlite3.OperationalError as err:
@@ -79,11 +87,12 @@ def get_one_user(hacker_id):
 
     # Combining all of it to JSONify
     one_user = {
-            "name": hacker[1],
-            "company": hacker[2],
-            "email": hacker[3],
-            "phone": hacker[4],
-            "skills": skills
+            "1. name": hacker[1],
+            "2. company": hacker[2],
+            "3. email": hacker[3],
+            "4. phone": hacker[4],
+            "5. skills": skills,
+            "6. events": events
     }
 
     return jsonify(one_user) # Done
@@ -143,8 +152,33 @@ def update_user(hacker_id):
                     if (skl['skill'],) in current_skills: # Updating a skill
                         cursor.execute('UPDATE hacker_skills SET rating = ? WHERE hacker_id = ?;', (skl['rating'], hacker_id))
                     else: # Adding a skill they didn't have yet
-                        cursor.execute('''INSERT INTO hacker_skills (hacker_id, skill, rating)
-                                          VALUES (?, ?, ?);''', (hacker_id, skl['skill'], skl['rating']))
+                        cursor.execute('''
+                            INSERT INTO hacker_skills (hacker_id, skill, rating)
+                            VALUES (?, ?, ?);''', (hacker_id, skl['skill'], skl['rating']))
+                        
+            # For updating hacker_events
+            elif data == 'events':
+                # Querying for all their attended events
+                cursor.execute('SELECT event FROM hacker_events WHERE hacker_id = ?;', (hacker_id,))
+                attended_events = cursor.fetchall()
+
+                # Checking every skill to change
+                for evt in updated_data['events']:
+                    # Must check if a user rated this event
+                    if (len(evt) == 2): # rated
+                        if (evt['event'],) in attended_events: # Updating event rating
+                            cursor.execute('UPDATE hacker_events SET rating = ? WHERE hacker_id = ?;', (evt['rating'], hacker_id))
+                        else:
+                            cursor.execute('''
+                                INSERT INTO hacker_events (hacker_id, event, rating)
+                                VALUES (?, ?, ?);''', (hacker_id, evt['event'], evt['rating']))
+                    elif (len(evt) == 1): # unrated
+                        if (evt['event'],) in attended_events: # Updating event rating but given no rating, so skip
+                            continue
+                        else:
+                            cursor.execute('''
+                                INSERT INTO hacker_events (hacker_id, event)
+                                VALUES (?, ?);''', (hacker_id, evt['event']))
         
         # Done modifying the database
         conn.commit()
@@ -164,6 +198,12 @@ def get_skills():
     min_frq = request.args.get('min_frequency')
     max_frq = request.args.get('max_frequency')
     
+    # Can't have negative frequency
+    if min_frq is None:
+        min_frq = 0
+    else:
+        min_frq = abs(int(min_frq))
+
     try:
         # Connecting to database
         conn = sqlite3.connect('hackers.db')
@@ -171,25 +211,7 @@ def get_skills():
 
         # User has option of not providing any of the bounds.
         # Given no bounds, show frequency of all skills
-        if min_frq == None and max_frq == None:
-            cursor.execute('''
-                SELECT skill, COUNT(skill) AS frequency
-                FROM hacker_skills
-                GROUP BY skill
-                ORDER BY frequency DESC;''')
-            
-        # If given one bound, show those below/above it
-        elif min_frq == None:
-            max_frq = int(max_frq)
-            cursor.execute('''
-                SELECT skill, COUNT(skill) AS frequency
-                FROM hacker_skills
-                GROUP BY skill
-                HAVING frequency <= ?
-                ORDER BY frequency DESC;''', (max_frq,))
-            
-        elif max_frq == None:
-            min_frq = int(min_frq)
+        if max_frq == None:
             cursor.execute('''
                 SELECT skill, COUNT(skill) AS frequency
                 FROM hacker_skills
@@ -199,25 +221,13 @@ def get_skills():
         
         # If given both, apply both
         else:
-            max_frq = int(max_frq)
-            min_frq = int(min_frq)
-
-            # Need to make sure that the bounds aren't flipped
-            if max_frq < min_frq:
-                cursor.execute('''
-                    SELECT skill, COUNT(skill) AS frequency
-                    FROM hacker_skills
-                    GROUP BY skill
-                    HAVING frequency BETWEEN ? AND ?
-                    ORDER BY frequency DESC;''', (max_frq, min_frq))
-                
-            else:
-                cursor.execute('''
-                    SELECT skill, COUNT(skill) AS frequency
-                    FROM hacker_skills
-                    GROUP BY skill
-                    HAVING frequency BETWEEN ? AND ?
-                    ORDER BY frequency DESC;''', (min_frq, max_frq))
+            max_frq = abs(int(max_frq))
+            cursor.execute('''
+                SELECT skill, COUNT(skill) AS frequency
+                FROM hacker_skills
+                GROUP BY skill
+                HAVING frequency BETWEEN ? AND ?
+                ORDER BY frequency DESC;''', (min(min_frq, max_frq), max(min_frq, max_frq)))
         
         skills = cursor.fetchall() # Final results
 
@@ -232,6 +242,91 @@ def get_skills():
         return f"Type Error: Invalid query string parameter type given\n{err}", 400
     
     return jsonify(skills) # Return JSONified
+
+@app.route('/events/', methods=['GET'])
+def get_events():
+    # Extracting parameters from the query string
+    # Given as strings first
+    min_frq = request.args.get('min_frequency')
+    max_frq = request.args.get('max_frequency')
+    min_rtg = request.args.get('min_rating')
+    max_rtg = request.args.get('max_rating')
+
+    if min_frq is None:
+        min_frq = 0
+    else:
+        min_frq = abs(int(min_frq))
+    if min_rtg is None:
+        min_rtg = 0
+    else:
+        min_rtg = abs(int(min_rtg))
+    if max_rtg is None:
+        max_rtg = 10
+    else:
+        max_rtg = abs(int(max_rtg))
+
+    try:
+        # Connecting to database
+        conn = sqlite3.connect('hackers.db')
+        cursor = conn.cursor()
+
+        # User has option of not providing any of the bounds.
+        # Given no bounds, show frequency of all skills
+        if max_frq == None:
+            cursor.execute('''
+                    SELECT event, rating, COUNT(event) as frq, AVG(rating) AS avg
+                    FROM hacker_events
+                    WHERE rating IS NOT NULL
+                    GROUP BY event
+                    HAVING avg BETWEEN ? AND ?
+                        AND frq >= ?
+                    ORDER BY avg DESC;''', (min(min_rtg, max_rtg), max(min_rtg, max_rtg), min_frq))
+        
+        # If given both, apply both
+        else:
+            max_frq = abs(int(max_frq))
+            cursor.execute('''
+                SELECT event, rating, COUNT(event) as frq, AVG(rating) AS avg
+                FROM hacker_events
+                WHERE rating IS NOT NULL
+                GROUP BY event
+                HAVING frq BETWEEN ? AND ?
+                    AND avg BETWEEN ? AND ?
+                ORDER BY avg DESC;''', (min(min_frq, max_frq), max(min_frq, max_frq), min(min_rtg, max_rtg), max(min_rtg, max_rtg)))
+            
+        rated_events = cursor.fetchall()
+
+        if max_frq == None:
+            cursor.execute('''
+                    SELECT event, COUNT(event) AS frq
+                    FROM hacker_events
+                    WHERE rating IS NULL
+                    GROUP BY event
+                    HAVING frq >= ?;''', (min_frq,))
+        
+        # If given both, apply both
+        else:
+            max_frq = abs(int(max_frq))
+            cursor.execute('''
+                SELECT event, COUNT(event) as frq
+                FROM hacker_events
+                WHERE rating IS NULL
+                GROUP BY event
+                HAVING frq BETWEEN ? AND ?;''', (min(min_frq, max_frq), max(min_frq, max_frq)))
+
+        unrated_events = cursor.fetchall()
+
+        conn.close() # Done
+    
+    except sqlite3.OperationalError as err:
+        conn.close()
+        return f"Operational Error: Could not connect to the database\n{err}", 500
+
+    except TypeError as err:
+        conn.close()
+        return f"Type Error: Invalid query string parameter type given\n{err}", 400
+
+    return jsonify(rated_events + unrated_events) # Return JSONified
 
 if __name__ == '__main__':
     app.run(debug=True)
