@@ -24,14 +24,21 @@ database_setup.py
       tables mentioned above
 
 app.py
-  Endpoint: /users/
+  Endpoint: GET /users/
     - Returns a JSON of all user data
-  Endpoint: /users/INT
+  Endpoint: GET /users/INT
     - Returns a JSON of a specific user's data
-  Endpoint: /users/INT + JSON
+  Endpoint: PUT /users/INT + JSON
     - Updates a user's data in the database, then returns their updated data
-  Endpoint: /skills/
+  Endpoint: GET /skills/
     - Returns a JSON of skills of users and their frequency in the database
-  Endpoint: /skills/?min_frequency=INT&max_frequency=INT
+  Endpoint: GET /skills/?min_frequency=INT&max_frequency=INT
     - Returns a JSON of skills of users and their frequency, but only for skills whose frequency are within the bounds set
   
+Extra Notes:
+1. When the user data gets output, the categories are sorted alphabetically, instead of the order given in the code.
+2. If I were to implement some functionality for events, I would handle it very similarly to skills
+- A whole separate table for events attended, with columns: hacker_id | event | rating (optional)
+- hacker_id would be a foreign key to link it to the other tables.
+- For a hacker to register to an event, they could scan a QR code that redirects them to a url, like /event/(EVENT_NAME),
+  which would trigger the event being added to hacker_events with their hacker_id
