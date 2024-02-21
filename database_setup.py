@@ -3,7 +3,8 @@ import sqlite3, requests, json
 # This is designed to transfer files from a JSON to an SQL database
 # It organizes data into 2 tables, hacker and hacker_skills.
 # hacker consists of a person's: hacker_id (PRIMARY), name, company, email, and phone
-# hacker_skill consists of: hacker_id (FOREIGN), skill, and rating, where hacker_id is used to link the 2 tables.
+# hacker_skill consists of: hacker_id (FOREIGN), skill, and rating, where hacker_id links all tables.
+# hacker_events consists of: hacker_id (FOREIGN), event, and rating (optional), where rating can be null and in [0, 10]
 def get_db():
     try:
         # HTTP request for the JSON
@@ -18,7 +19,7 @@ def get_db():
         conn = sqlite3.connect('hackers.db')
         cursor = conn.cursor()
 
-        # Setting up the 2 tables
+        # Setting up the tables
         cursor.execute(
             '''CREATE TABLE IF NOT EXISTS hackers (
                 hacker_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
@@ -32,6 +33,13 @@ def get_db():
                 hacker_id INTEGER,
                 skill TEXT,
                 rating INTEGER,
+                FOREIGN KEY (hacker_id) REFERENCES hackers(hacker_id)
+            );''')
+        cursor.execute(
+            '''CREATE TABLE IF NOT EXISTS hacker_events (
+                hacker_id INTEGER,
+                event TEXT,
+                rating INTEGER CHECK ((rating >= 0 AND rating <= 10) OR rating IS NULL) DEFAULT NULL,
                 FOREIGN KEY (hacker_id) REFERENCES hackers(hacker_id)
             );''')
 
