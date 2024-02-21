@@ -29,6 +29,7 @@ database_setup.py
     get_db()
     - Sends an HTTP request for the JSON then creates an SQL database with the data organized into the
       tables mentioned above
+    - hackers & hacker_skills start with data, while hacker_events starts empty (as if HTN hasn't started yet)
 
 app.py
   Endpoint: GET /users/
