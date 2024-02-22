@@ -48,7 +48,7 @@ app.py
     - Returns a JSON of events attended with the constraints given
 ```
 Extra Notes:
-1. Right now, events are treated the same as skills, but I would hope to make a few changes, if I have the time.
+1. Right now, events are treated the same as skills, but I hope to make a few changes.
 - Instead of making some PUT + JSON request, hackers could scan a QR code, which redirects them to a url like: /events/<EVENT_NAME>
     which adds a new row to hacker_events, with their hacker_id
 - This page would also have the option of adding a rating
